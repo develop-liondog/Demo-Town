@@ -7,10 +7,16 @@ public class TownController : MonoBehaviour
 	public float time = 8;
 	public GameObject cloudParent = null;
 	public Light directionalLight = null;
+	public float deactiveStreetlampMinTime = 6;
+	public float deactiveStreetlampMaxTime = 18;
+	private List<StreetlampController> streetlampControllerList = new List<StreetlampController>();
 
 	void Start()
 	{
-        
+		foreach( var ctrl in GetComponentsInChildren<StreetlampController>() )
+		{
+			this.streetlampControllerList.Add( ctrl );
+		}
 	}
 
 	// Update is called once per frame
@@ -36,10 +42,25 @@ public class TownController : MonoBehaviour
 
 	void UpdateLight( float deltaTime )
 	{
+		// ‘¾—zŒõ
 		Animator animator = this.directionalLight.GetComponent<Animator>();
 		if( animator )
 		{
 			animator.SetFloat( "Motion Time", this.time / 24 );
+		}
+
+		// ŠX“”(–éŠÔ‚Ì‚Ý“_“”‚·‚é)
+		bool isActiveStreetlamp = false;
+		if(
+			( this.time < this.deactiveStreetlampMinTime )
+			|| ( this.time > this.deactiveStreetlampMaxTime )
+		)
+		{
+			isActiveStreetlamp = true;
+		}
+		foreach( var ctrl in this.streetlampControllerList )
+		{
+			ctrl.SetActiveLight( isActiveStreetlamp );
 		}
 	}
 }

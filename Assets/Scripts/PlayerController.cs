@@ -16,12 +16,7 @@ public class PlayerController : MonoBehaviour
 	private Animator animator = null;
 	private UnityEngine.AI.NavMeshAgent agent;
 	private RaycastHit hit;
-	private bool isRunning = false;
-	private float speed = 0;
 	private State state = State.Idle;
-	private float turnAngle = 30.0f;
-	private float turnAngularSpeed = 120.0f;
-	private float moveSpeed = 3.0f;
 	private float endDistance = 0;
 	private Vector3 targetPos = Vector3.zero;
 	private float animatorForward = 0;
