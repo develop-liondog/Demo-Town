@@ -1,15 +1,17 @@
 ﻿using System.Collections;
-
 using System.Collections.Generic;
 using UnityEngine;
 using Assets.Scripts;
+using Assets.Scripts.AI;
+using Assets.Scripts.AI.Player;
+using Assets.Scripts.AI.NonePlayer;
 
 /// <summary>
 /// キャラクター制御(プレイヤー、NPC)
 /// </summary>
 public class CharacterController : MonoBehaviour
 {
-	private enum State
+	public enum State
 	{
 		Idle,
 		PathWait,
@@ -18,7 +20,6 @@ public class CharacterController : MonoBehaviour
 	}
 	private Animator animator = null;
 	private UnityEngine.AI.NavMeshAgent agent;
-	private RaycastHit hit;
 	private State state = State.Idle;
 	private float endDistance = 0;
 	private Vector3 targetPos = Vector3.zero;
@@ -27,8 +28,22 @@ public class CharacterController : MonoBehaviour
 	private float animatorTurn = 0;
 	private float animatorTurnMax = 1;
 	private TownController townController = null;
+	private CharacterStateMachine stateMachine = null;
+	public bool isPlayer = false;
 	public float passDistance = 0.5f;
 	public Transform lookAtTransform = null;
+	public Transform targetTransform = null;
+
+	/// <summary>
+	/// 現在の状態
+	/// </summary>
+	public State CurrentState
+	{
+		get
+		{
+			return this.state;
+		}
+	}
 
 	/// <summary>
 	/// カメラの注視点
@@ -41,6 +56,17 @@ public class CharacterController : MonoBehaviour
 		}
 	}
 
+	/// <summary>
+	/// ターゲット
+	/// </summary>
+	public Transform TargetTransform
+	{
+		get
+		{
+			return this.targetTransform;
+		}
+	}
+
 	// Start is called before the first frame update
 	void Start()
 	{
@@ -49,12 +75,28 @@ public class CharacterController : MonoBehaviour
 		this.agent = GetComponentInChildren<UnityEngine.AI.NavMeshAgent>();
 		this.agent.updatePosition = false;
 		this.animator.SetFloat( "Forward", 0);
+
+		Rigidbody rigidbody = GetComponent<Rigidbody>();
+//		rigidbody.detectCollisions = false;
+
+		// AI
+		this.stateMachine = new CharacterStateMachine( this );
+
+		// プレイヤーなら
+		if( this.isPlayer )
+		{
+			this.stateMachine.ChangeState( new PlayerState() );
+		}
+		else
+		{
+			this.stateMachine.ChangeState( new FollowState( 3, 6 ) );
+		}
 	}
 
 	/// <summary>
 	/// 更新
 	/// </summary>
-	void Update()
+	void FixedUpdate()
 	{
 		// AI更新
 		UpdateAI();
@@ -63,16 +105,21 @@ public class CharacterController : MonoBehaviour
 		UpdateAnimatorParameteies();
 
 		// 歩き更新
-		UpdateWalk( Time.deltaTime );
+		UpdateWalk( Time.fixedDeltaTime );
 	}
 
-	public void StartWalk( Vector3 pos )
+	/// <summary>
+	/// ナビゲーション付きの移動
+	/// </summary>
+	/// <param name="pos"></param>
+	public void StartWalk( Vector3 pos, float endDistance )
 	{
 		if( this.agent.isOnNavMesh )
 		{
-			this.agent.SetDestination( hit.point );
+			this.agent.SetDestination( pos );
 			this.state = State.PathWait;
-			this.targetPos = hit.point;
+			this.targetPos = pos;
+			this.passDistance = endDistance;
 		}
 	}
 
@@ -81,6 +128,9 @@ public class CharacterController : MonoBehaviour
 	/// </summary>
 	private void UpdateAI()
 	{
+		this.stateMachine.Update();
+
+	/*
 		if( Input.GetMouseButton( 0 ) )
 		{
 			Ray ray = Camera.main.ScreenPointToRay( Input.mousePosition );
@@ -89,6 +139,7 @@ public class CharacterController : MonoBehaviour
 				StartWalk( hit.point );
 			}
 		}
+	*/
 	}
 
 	/// <summary>
@@ -143,27 +194,45 @@ public class CharacterController : MonoBehaviour
 
 				// その方向に向けて旋回する(120度/秒)
 				Quaternion targetRotation = Quaternion.LookRotation( targetDir );
-				transform.rotation = Quaternion.RotateTowards( transform.rotation, targetRotation, 120f * Time.deltaTime );
 
 				// 自分の向きと次の位置の角度差が30度以上の場合、その場で旋回
 				float angle = Vector3.SignedAngle( targetDir, transform.forward, Vector3.up );
-				if( Mathf.Abs( angle ) < 30f )
+				if( Mathf.Abs( angle ) < 20f )
 				{
 					if( this.animator.GetCurrentAnimatorStateInfo( 0 ).nameHash == Animator.StringToHash( "Base Layer.Locomotion" ) )
 					{
 						// 以下、キャラクターの移動処理
 						Vector3 velocity = new Vector3( 0, 0, 1 );
 						velocity = transform.TransformDirection( velocity );
-						transform.localPosition += velocity * 4.0f * Time.deltaTime;
+						//transform.localPosition += velocity * 4.0f * Time.deltaTime;
 					}
 
 					// もしもの場合の補正
 					//if (Vector3.Distance(nextPoint, transform.position) < 0.5f)　transform.position = nextPoint;
+					if( Mathf.Abs( angle ) > 5.0f )
+					{
+						AccelAnimatorTurn( angle < 0 ? 1 : -1, 0.2f, 0.4f );
+					}
+					else
+					{
+						transform.rotation = Quaternion.RotateTowards( transform.rotation, targetRotation, 120f * Time.deltaTime );
+					}
 					AccelAnimatorForward( 0.3f );
 				}
 				else
 				{
-					AccelAnimatorTurn( angle > 0 ? 1 : -1, 0.1f, 0.4f );
+					AccelAnimatorTurn( angle < 0 ? 1 : -1, 0.2f, 0.8f );
+				}
+
+				// 地面の高さに補正する
+				Vector3 originPos = this.transform.position;
+				originPos.y += 0.1f;
+				Ray ray = new Ray( originPos, Vector3.down );
+				RaycastHit hit = new RaycastHit();
+				if( Physics.Raycast( ray, out hit, 100 ) )
+				{
+					Vector3 offset = new Vector3( 0, 0, 0 );
+					this.transform.position = hit.point + offset;
 				}
 
 				// targetに向かって移動します。
@@ -220,7 +289,7 @@ public class CharacterController : MonoBehaviour
 	/// 前進
 	/// </summary>
 	/// <param name="value"></param>
-	private void AccelAnimatorForward( float value = 0.1f )
+	public void AccelAnimatorForward( float value = 0.1f )
 	{
 		if( ( this.animatorForward == 0 )
 			|| ( ( this.animatorForward * value ) < 0 )
@@ -249,7 +318,7 @@ public class CharacterController : MonoBehaviour
 	/// <param name="side"></param>
 	/// <param name="value"></param>
 	/// <param name="max"></param>
-	private void AccelAnimatorTurn( int side, float value = 0.1f, float max = 0.25f )
+	public void AccelAnimatorTurn( int side, float value = 0.1f, float max = 0.25f )
 	{
 		this.animatorSide = side;
 		this.animatorTurnMax = max;
@@ -265,6 +334,12 @@ public class CharacterController : MonoBehaviour
 		}
 		this.animatorTurn = Utility.Min<float>( this.animatorTurn, this.animatorTurnMax );
 		this.animator.SetFloat( "Turn", this.animatorTurn * side );
+	}
+
+	private void ClearAnimatorTurn()
+	{
+		this.animatorTurn = 0;
+		this.animator.SetFloat( "Turn", this.animatorTurn );
 	}
 
 
@@ -319,10 +394,17 @@ public class CharacterController : MonoBehaviour
 		isEnd = false;
 		return result;
 	}
-
-
+	void OnCollisionEnter( Collision other )
+	{
+		Debug.LogFormat( "Collision {0}", other.gameObject.name );
+	}
 	void OnGUI()
 	{
+		if( this.townController == null )
+		{
+			return;
+		}
+
 		int y = 30;
 		GUI.Label( new Rect( Screen.width - 245, y, 250, 30 ), string.Format( "Time:{0}", this.townController.time ) );
 		y += 20;
@@ -340,7 +422,15 @@ public class CharacterController : MonoBehaviour
 	private void OnAnimatorIK( int layerIndex )
 	{
 		this.animator.SetLookAtWeight( 1.0f, 0.2f, 0.4f, 1.0f, 0.3f );
-		this.animator.SetLookAtPosition( ( this.state == State.Running ) ? this.hit.point : Camera.main.transform.position );
+
+		if( this.TargetTransform != null )
+		{
+			this.animator.SetLookAtPosition( this.TargetTransform.position );
+		}
+		else
+		{
+			this.animator.SetLookAtPosition( ( this.state == State.Running ) ? this.targetPos : Camera.main.transform.position );
+		}
 	}
 
 	private void OnDrawGizmos()

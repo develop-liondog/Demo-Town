@@ -26,27 +26,6 @@ public class PlayerCamera : MonoBehaviour
         {
             return;
         }
-		/*
-				// 右クリックを押している時だけカメラを回転させる
-				if( Input.GetMouseButton( 1 ) )
-				{
-					this.angleX += Input.GetAxis( "Mouse Y" ) * this.speed;
-					this.angleY += Input.GetAxis( "Mouse X" ) * this.speed;
-				}
-
-				// ホイールによるカメラの前後移動
-				this.offset.z -= Input.mouseScrollDelta.y;
-				if( this.offset.z < 0.1f )
-				{
-					this.offset.z = 0.1f;
-				}
-
-				// プレイヤーを視点にカメラの位置を決定
-				Vector3 rotOffset = Quaternion.Euler( this.angleX, this.angleY, 0 ) * this.offset;
-				rotOffset.y = Assets.Scripts.Utility.Round<float>( rotOffset.y, 10, 100 ); 
-				this.camera.transform.position = this.owner.transform.position + rotOffset;
-				this.camera.transform.LookAt( this.owner.transform );
-			*/
 
 		// 右クリックを押している時だけカメラを回転させる
 		if( Input.GetMouseButton( 1 ) )
@@ -64,7 +43,17 @@ public class PlayerCamera : MonoBehaviour
 
 		// プレイヤーを視点にカメラの位置を決定
 		Vector3 rotOffset = Quaternion.Euler( this.angleX, this.angleY, 0 ) * this.offset;
-		this.camera.transform.position = this.owner.transform.position + rotOffset;
+		Vector3 cameraPos = this.owner.transform.position + rotOffset;
+
+		// プレイヤーとカメラの間に障害物が挟まらないように位置補正
+		Vector3 direction = cameraPos - this.owner.LookAtTransform.position;
+		Ray ray = new Ray( this.owner.LookAtTransform.position, direction.normalized );
+		RaycastHit hit = new RaycastHit();
+		if( Physics.Raycast( ray, out hit, direction.magnitude ) )
+		{
+			cameraPos = hit.point;
+		}
+		this.camera.transform.position = cameraPos;
 		this.camera.transform.LookAt( this.owner.LookAtTransform );
 	}
 }

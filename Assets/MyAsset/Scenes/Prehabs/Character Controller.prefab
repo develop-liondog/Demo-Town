@@ -2787,6 +2787,7 @@ GameObject:
   - component: {fileID: 5868667953660928977}
   - component: {fileID: 2238065719227612426}
   - component: {fileID: 3329422126844278516}
+  - component: {fileID: 4218812694265801201}
   m_Layer: 0
   m_Name: Character Controller
   m_TagString: Untagged
@@ -2864,5 +2865,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 557db08633831d44ea5593e1a320c895, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isPlayer: 0
   passDistance: 0.5
   lookAtTransform: {fileID: 7018578081152958127}
+  targetTransform: {fileID: 0}
+--- !u!136 &4218812694265801201
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8995150393032039578}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  m_Radius: 0.2
+  m_Height: 2
+  m_Direction: 1
+  m_Center: {x: 0, y: 1, z: 0}

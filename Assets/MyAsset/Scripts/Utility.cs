@@ -1,13 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using UnityEngine;
+
 
 namespace Assets.Scripts
 {
 	public static class Utility
 	{
+		/// <summary>
+		/// 小さい方の値を得る
+		/// </summary>
+		/// <typeparam name="Type"></typeparam>
+		/// <param name="value"></param>
+		/// <param name="min"></param>
+		/// <returns></returns>
 		public static Type Min<Type>( Type value, Type min ) where Type : IComparable
 		{
 			if( value.CompareTo( min ) > 0 )
@@ -17,6 +22,13 @@ namespace Assets.Scripts
 			return value;
 		}
 
+		/// <summary>
+		/// 大きい方の値を得る
+		/// </summary>
+		/// <typeparam name="Type"></typeparam>
+		/// <param name="value"></param>
+		/// <param name="max"></param>
+		/// <returns></returns>
 		public static Type Max<Type>( Type value, Type max) where Type : IComparable
 		{
 			if( value.CompareTo( max ) < 0 )
@@ -45,6 +57,19 @@ namespace Assets.Scripts
 				value = min;
 			}
 			return value;
+		}
+
+		/// <summary>
+		/// XZ平面の距離
+		/// </summary>
+		/// <param name="a"></param>
+		/// <param name="b"></param>
+		/// <returns></returns>
+		public static float GetDistanceXZ( Vector3 a, Vector3 b )
+		{
+			Vector3 vec = a - b;
+			vec.y = 0;
+			return vec.magnitude;
 		}
 	}
 }
