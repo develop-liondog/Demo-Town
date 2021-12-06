@@ -4,7 +4,10 @@ using System.Collections.Generic;
 using UnityEngine;
 using Assets.Scripts;
 
-public class PlayerController : MonoBehaviour
+/// <summary>
+/// キャラクター制御(プレイヤー、NPC)
+/// </summary>
+public class CharacterController : MonoBehaviour
 {
 	private enum State
 	{
@@ -23,10 +26,13 @@ public class PlayerController : MonoBehaviour
 	private float animatorSide = 0;
 	private float animatorTurn = 0;
 	private float animatorTurnMax = 1;
+	private TownController townController = null;
 	public float passDistance = 0.5f;
 	public Transform lookAtTransform = null;
-	public TownController townController = null;
 
+	/// <summary>
+	/// カメラの注視点
+	/// </summary>
 	public Transform LookAtTransform
 	{
 		get
@@ -39,40 +45,61 @@ public class PlayerController : MonoBehaviour
 	void Start()
 	{
 		this.townController = FindObjectOfType<TownController>();
-		this.animator = GetComponent<Animator>();
-		this.agent = GetComponent<UnityEngine.AI.NavMeshAgent>();
+		this.animator = GetComponentInChildren<Animator>();
+		this.agent = GetComponentInChildren<UnityEngine.AI.NavMeshAgent>();
 		this.agent.updatePosition = false;
 		this.animator.SetFloat( "Forward", 0);
 	}
 
-	// Update is called once per frame
-	void FixedUpdate()
+	/// <summary>
+	/// 更新
+	/// </summary>
+	void Update()
 	{
+		// AI更新
+		UpdateAI();
+
 		// アニメーションパラメータの更新
 		UpdateAnimatorParameteies();
 
+		// 歩き更新
+		UpdateWalk( Time.deltaTime );
+	}
+
+	public void StartWalk( Vector3 pos )
+	{
+		if( this.agent.isOnNavMesh )
+		{
+			this.agent.SetDestination( hit.point );
+			this.state = State.PathWait;
+			this.targetPos = hit.point;
+		}
+	}
+
+	/// <summary>
+	/// 行動制御
+	/// </summary>
+	private void UpdateAI()
+	{
+		if( Input.GetMouseButton( 0 ) )
+		{
+			Ray ray = Camera.main.ScreenPointToRay( Input.mousePosition );
+			if( Physics.Raycast( ray, out hit, 1000 ) )
+			{
+				StartWalk( hit.point );
+			}
+		}
+	}
+
+	/// <summary>
+	/// 移動更新
+	/// </summary>
+	private void UpdateWalk( float deltaTime )
+	{
 		switch( this.state )
 		{
 		case State.Idle:
 			{
-				if( Input.GetMouseButton( 0 ) )
-				{
-					Ray ray = Camera.main.ScreenPointToRay( Input.mousePosition );
-					if( Physics.Raycast( ray, out hit, 1000 ))
-					{
-						if( this.agent.isOnNavMesh )
-						{
-							this.agent.SetDestination( hit.point );
-							this.state = State.PathWait;
-							this.targetPos = hit.point;
-						}
-						else
-						{
-							Debug.LogError( "NavMeshが存在していません！" );
-						}
-					}
-				}
-
 			}
 			break;
 
@@ -116,7 +143,7 @@ public class PlayerController : MonoBehaviour
 
 				// その方向に向けて旋回する(120度/秒)
 				Quaternion targetRotation = Quaternion.LookRotation( targetDir );
-				transform.rotation = Quaternion.RotateTowards( transform.rotation, targetRotation, 120f * Time.fixedDeltaTime );
+				transform.rotation = Quaternion.RotateTowards( transform.rotation, targetRotation, 120f * Time.deltaTime );
 
 				// 自分の向きと次の位置の角度差が30度以上の場合、その場で旋回
 				float angle = Vector3.SignedAngle( targetDir, transform.forward, Vector3.up );
@@ -127,12 +154,12 @@ public class PlayerController : MonoBehaviour
 						// 以下、キャラクターの移動処理
 						Vector3 velocity = new Vector3( 0, 0, 1 );
 						velocity = transform.TransformDirection( velocity );
-						transform.localPosition += velocity * 4.0f * Time.fixedDeltaTime;
+						transform.localPosition += velocity * 4.0f * Time.deltaTime;
 					}
 
 					// もしもの場合の補正
 					//if (Vector3.Distance(nextPoint, transform.position) < 0.5f)　transform.position = nextPoint;
-					AccelAnimatorSpeed( 0.3f );
+					AccelAnimatorForward( 0.3f );
 				}
 				else
 				{
@@ -156,13 +183,16 @@ public class PlayerController : MonoBehaviour
 					// 以下、キャラクターの移動処理
 					Vector3 velocity = new Vector3( 0, 0, 1 );
 					velocity = transform.TransformDirection( velocity );
-					transform.localPosition += velocity * 4.0f * this.animatorForward * Time.fixedDeltaTime;
+					transform.localPosition += velocity * 4.0f * this.animatorForward * deltaTime;
 				}
 			}
 			break;
 		}
 	}
 
+	/// <summary>
+	/// アニメーションパラメータの更新
+	/// </summary>
 	private void UpdateAnimatorParameteies()
 	{
 		// 前進
@@ -186,7 +216,11 @@ public class PlayerController : MonoBehaviour
 		this.animator.SetFloat( "Turn", this.animatorTurn * this.animatorSide );
 	}
 
-	private void AccelAnimatorSpeed( float value = 0.1f )
+	/// <summary>
+	/// 前進
+	/// </summary>
+	/// <param name="value"></param>
+	private void AccelAnimatorForward( float value = 0.1f )
 	{
 		if( ( this.animatorForward == 0 )
 			|| ( ( this.animatorForward * value ) < 0 )
@@ -209,6 +243,12 @@ public class PlayerController : MonoBehaviour
 		this.animator.SetFloat( "Forward", this.animatorForward );
 	}
 
+	/// <summary>
+	/// 回転
+	/// </summary>
+	/// <param name="side"></param>
+	/// <param name="value"></param>
+	/// <param name="max"></param>
 	private void AccelAnimatorTurn( int side, float value = 0.1f, float max = 0.25f )
 	{
 		this.animatorSide = side;

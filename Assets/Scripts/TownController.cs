@@ -5,6 +5,7 @@ using UnityEngine;
 public class TownController : MonoBehaviour
 {
 	public float time = 8;
+	public float timescale = 0.1f;
 	public GameObject cloudParent = null;
 	public Light directionalLight = null;
 	public float deactiveStreetlampMinTime = 6;
@@ -22,7 +23,7 @@ public class TownController : MonoBehaviour
 	// Update is called once per frame
 	void FixedUpdate()
 	{
-		this.time += Time.fixedDeltaTime;
+		this.time += Time.fixedDeltaTime * this.timescale;
 		if( this.time >= 24 )
 		{
 			this.time = 0;

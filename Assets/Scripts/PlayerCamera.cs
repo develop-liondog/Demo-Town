@@ -6,7 +6,7 @@ using Assets.Scripts;
 public class PlayerCamera : MonoBehaviour
 {
     private GameObject camera = null;
-    public PlayerController owner = null;
+    public CharacterController owner = null;
     public Vector3 offset = new Vector3( 0, 1, 10 );
 	public Vector3 lookAtOffset = new Vector3( 0, 3, 0 );
 	public float angleX = 0;
