@@ -13,7 +13,9 @@ namespace Assets.Scripts.AI.Player
 	/// </summary>
 	public class PlayerState : CharacterState
 	{
-		public override void Update( CharacterStateContext context )
+		private bool isKeyDownSpace = false;
+
+		public override void FixedUpdate( CharacterStateContext context )
 		{
 			if( Input.GetMouseButton( 0 ) )
 			{
@@ -21,23 +23,33 @@ namespace Assets.Scripts.AI.Player
 				RaycastHit hit = new RaycastHit();
 				if( Physics.Raycast( ray, out hit, 1000 ) )
 				{
-					context.Owner.StartWalk( hit.point, 1 );
+					context.Owner.StartNavigationWalk( hit.point, 1 );
 				}
 			}
 
-			if( Input.GetKey( KeyCode.W ) )
+			// ジャンプ
+			if( this.isKeyDownSpace )
 			{
-				context.Owner.AccelAnimatorForward( 0.1f );
+				context.Owner.Jump();
 			}
-			if( Input.GetKey( KeyCode.A ) )
-			{
-				context.Owner.AccelAnimatorTurn( -1, 0.3f, 1.0f );
-			}
-			else if( Input.GetKey( KeyCode.D ) )
-			{
-				context.Owner.AccelAnimatorTurn( 1, 0.3f, 1.0f );
-			}
+
+			// 十字キー入力による移動
+			context.Owner.UpdateCrossKeyWalk(
+				Input.GetKey( KeyCode.W ),
+				Input.GetKey( KeyCode.D ),
+				Input.GetKey( KeyCode.S ),
+				Input.GetKey( KeyCode.A )
+			);
+
+			this.isKeyDownSpace = false;
 		}
 
+		public override void Update( CharacterStateContext context )
+		{
+			if( Input.GetKeyDown( KeyCode.Space ) )
+			{
+				this.isKeyDownSpace = true;
+			}
+		}
 	}
 }

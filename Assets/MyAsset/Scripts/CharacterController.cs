@@ -1,5 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
 using UnityEngine;
 using Assets.Scripts;
 using Assets.Scripts.AI;
@@ -11,7 +10,32 @@ using Assets.Scripts.AI.NonePlayer;
 /// </summary>
 public class CharacterController : MonoBehaviour
 {
-	public enum State
+	public enum CrossKey
+	{
+		Up,
+		Right,
+		Down,
+		Left
+	}
+
+	[Flags]
+	public enum CrossKeyFlags
+	{
+		None		= 0,
+		Up			= ( 1 << CrossKey.Up ),
+		UpRight		= ( 1 << CrossKey.Up ) | ( 1 << CrossKey.Right ),
+		Right		= ( 1 << CrossKey.Right ),
+		RightDown	= ( 1 << CrossKey.Right ) | ( 1 << CrossKey.Down ),
+		Down		= ( 1 << CrossKey.Down ),
+		DownLeft	= ( 1 << CrossKey.Left ) | ( 1 << CrossKey.Down ),
+		Left		= ( 1 << CrossKey.Left ),
+		LeftUp		= ( 1 << CrossKey.Left ) | ( 1 << CrossKey.Up ),
+	}
+
+	/// <summary>
+	/// ナビゲーション付き移動の状態
+	/// </summary>
+	public enum StateNavigationWalk
 	{
 		Idle,
 		PathWait,
@@ -19,8 +43,10 @@ public class CharacterController : MonoBehaviour
 		Stopping,
 	}
 	private Animator animator = null;
+	private Rigidbody rigidbody = null;
+	private CapsuleCollider collider = null;
 	private UnityEngine.AI.NavMeshAgent agent;
-	private State state = State.Idle;
+	private StateNavigationWalk state = StateNavigationWalk.Idle;
 	private float endDistance = 0;
 	private Vector3 targetPos = Vector3.zero;
 	private float animatorForward = 0;
@@ -29,6 +55,7 @@ public class CharacterController : MonoBehaviour
 	private float animatorTurnMax = 1;
 	private TownController townController = null;
 	private CharacterStateMachine stateMachine = null;
+	private bool isHitGround = true;
 	public bool isPlayer = false;
 	public float passDistance = 0.5f;
 	public Transform lookAtTransform = null;
@@ -37,7 +64,7 @@ public class CharacterController : MonoBehaviour
 	/// <summary>
 	/// 現在の状態
 	/// </summary>
-	public State CurrentState
+	public StateNavigationWalk CurrentState
 	{
 		get
 		{
@@ -71,9 +98,12 @@ public class CharacterController : MonoBehaviour
 	void Start()
 	{
 		this.townController = FindObjectOfType<TownController>();
+		this.rigidbody = GetComponentInChildren<Rigidbody>();
 		this.animator = GetComponentInChildren<Animator>();
+		this.collider = GetComponentInChildren<CapsuleCollider>();
 		this.agent = GetComponentInChildren<UnityEngine.AI.NavMeshAgent>();
 		this.agent.updatePosition = false;
+		this.agent.updateRotation = false;
 		this.animator.SetFloat( "Forward", 0);
 
 		Rigidbody rigidbody = GetComponent<Rigidbody>();
@@ -96,8 +126,20 @@ public class CharacterController : MonoBehaviour
 	/// <summary>
 	/// 更新
 	/// </summary>
+	void Update()
+	{
+		this.stateMachine.Update();
+	}
+
+	/// <summary>
+	/// 更新
+	/// </summary>
 	void FixedUpdate()
 	{
+		// targetに向かって移動します。
+		//this.agent.SetDestination( this.targetPos );
+		this.agent.nextPosition = transform.position;
+
 		// AI更新
 		UpdateAI();
 
@@ -105,22 +147,111 @@ public class CharacterController : MonoBehaviour
 		UpdateAnimatorParameteies();
 
 		// 歩き更新
-		UpdateWalk( Time.fixedDeltaTime );
+		UpdateNavigationWalk( Time.fixedDeltaTime );
+	}
+
+	/// <summary>
+	/// 十字キー入力による移動
+	/// </summary>
+	/// <param name="isUp"></param>
+	/// <param name="isRight"></param>
+	/// <param name="isDown"></param>
+	/// <param name="isLeft"></param>
+	public void UpdateCrossKeyWalk( bool isUp, bool isRight, bool isDown, bool isLeft )
+	{
+		// 入力をフラグに変換
+		CrossKeyFlags flags = CrossKeyFlags.None;
+		if( isUp )
+		{
+			flags |= CrossKeyFlags.Up;
+		}
+		if( isRight )
+		{
+			flags |= CrossKeyFlags.Right;
+		}
+		if( isDown )
+		{
+			flags |= CrossKeyFlags.Down;
+		}
+		if( isLeft )
+		{
+			flags |= CrossKeyFlags.Left;
+		}
+
+		// 特定の入力しか受け付けない
+		float offset = 0;
+		if( ( flags & CrossKeyFlags.UpRight ) == CrossKeyFlags.UpRight )
+		{
+			offset = 45;
+		}
+		else if( ( flags & CrossKeyFlags.RightDown ) == CrossKeyFlags.RightDown )
+		{
+			offset = 135;
+		}
+		else if( ( flags & CrossKeyFlags.DownLeft ) == CrossKeyFlags.DownLeft )
+		{
+			offset = 225;
+		}
+		else if( ( flags & CrossKeyFlags.LeftUp ) == CrossKeyFlags.LeftUp )
+		{
+			offset = 315;
+		}
+		else if( ( flags & CrossKeyFlags.Up ) == CrossKeyFlags.Up )
+		{
+			offset = 0;
+		}
+		else if( ( flags & CrossKeyFlags.Right ) == CrossKeyFlags.Right )
+		{
+			offset = 90;
+		}
+		else if( ( flags & CrossKeyFlags.Down ) == CrossKeyFlags.Down )
+		{
+			offset = 180;
+		}
+		else if( ( flags & CrossKeyFlags.Left ) == CrossKeyFlags.Left )
+		{
+			offset = 270;
+		}
+
+		// 何かしら入力がある時だけ処理
+		if( flags != 0 )
+		{
+			this.transform.rotation = Quaternion.Euler( 0.0f, Camera.main.transform.rotation.eulerAngles.y + offset, 0.0f );
+			AccelAnimatorForward( 0.5f );
+			StopNavigationWalk();
+		}
+	}
+
+	public void Jump()
+	{
+		if( this.isHitGround )
+		{
+			this.rigidbody.AddForce( Vector3.up * 5, ForceMode.VelocityChange );
+			this.isHitGround = false;
+		}
 	}
 
 	/// <summary>
 	/// ナビゲーション付きの移動
 	/// </summary>
 	/// <param name="pos"></param>
-	public void StartWalk( Vector3 pos, float endDistance )
+	public void StartNavigationWalk( Vector3 pos, float endDistance )
 	{
 		if( this.agent.isOnNavMesh )
 		{
 			this.agent.SetDestination( pos );
-			this.state = State.PathWait;
+			this.state = StateNavigationWalk.PathWait;
 			this.targetPos = pos;
 			this.passDistance = endDistance;
 		}
+	}
+
+	/// <summary>
+	/// ナビゲーション付き移動の強制停止
+	/// </summary>
+	public void StopNavigationWalk()
+	{
+		this.state = StateNavigationWalk.Idle;
 	}
 
 	/// <summary>
@@ -128,33 +259,22 @@ public class CharacterController : MonoBehaviour
 	/// </summary>
 	private void UpdateAI()
 	{
-		this.stateMachine.Update();
-
-	/*
-		if( Input.GetMouseButton( 0 ) )
-		{
-			Ray ray = Camera.main.ScreenPointToRay( Input.mousePosition );
-			if( Physics.Raycast( ray, out hit, 1000 ) )
-			{
-				StartWalk( hit.point );
-			}
-		}
-	*/
+		this.stateMachine.FixedUpdate();
 	}
 
 	/// <summary>
 	/// 移動更新
 	/// </summary>
-	private void UpdateWalk( float deltaTime )
+	private void UpdateNavigationWalk( float deltaTime )
 	{
 		switch( this.state )
 		{
-		case State.Idle:
+		case StateNavigationWalk.Idle:
 			{
 			}
 			break;
 
-		case State.PathWait:
+		case StateNavigationWalk.PathWait:
 			{
 				if( !this.agent.pathPending )
 				{
@@ -163,24 +283,24 @@ public class CharacterController : MonoBehaviour
 						|| ( this.agent.path.corners.Length == 0 )
 						)
 					{
-						this.state = State.Idle;
+						this.state = StateNavigationWalk.Idle;
 					}
 					else
 					{
-						this.state = State.Running;
+						this.state = StateNavigationWalk.Running;
 					}
 				}
 			}
 			break;
 
-		case State.Running:
+		case StateNavigationWalk.Running:
 			{
 				// 目的地についたら終了
 				Vector3 nextPos = this.agent.steeringTarget;
 				this.endDistance = GetDistanceXZ( this.agent.path.corners[ this.agent.path.corners.Length - 1 ], this.transform.position );
 				if( this.passDistance > this.endDistance )
 				{
-					this.state = State.Stopping;
+					this.state = StateNavigationWalk.Stopping;
 					break;
 				}
 
@@ -204,7 +324,9 @@ public class CharacterController : MonoBehaviour
 						// 以下、キャラクターの移動処理
 						Vector3 velocity = new Vector3( 0, 0, 1 );
 						velocity = transform.TransformDirection( velocity );
-						//transform.localPosition += velocity * 4.0f * Time.deltaTime;
+						transform.localPosition += velocity * 4.0f * Time.deltaTime;
+						//this.rigidbody.velocity = velocity;
+
 					}
 
 					// もしもの場合の補正
@@ -227,6 +349,8 @@ public class CharacterController : MonoBehaviour
 				// 地面の高さに補正する
 				Vector3 originPos = this.transform.position;
 				originPos.y += 0.1f;
+
+				/*
 				Ray ray = new Ray( originPos, Vector3.down );
 				RaycastHit hit = new RaycastHit();
 				if( Physics.Raycast( ray, out hit, 100 ) )
@@ -234,25 +358,23 @@ public class CharacterController : MonoBehaviour
 					Vector3 offset = new Vector3( 0, 0, 0 );
 					this.transform.position = hit.point + offset;
 				}
+				*/
 
-				// targetに向かって移動します。
-				this.agent.SetDestination( this.targetPos );
-				this.agent.nextPosition = transform.position;
 			}
 			break;
 
-		case State.Stopping:
+		case StateNavigationWalk.Stopping:
 			{
 				if( this.animator.GetCurrentAnimatorStateInfo( 0 ).nameHash == Animator.StringToHash( "Base Layer.Grounded" ) )
 				{
-					this.state = State.Idle;
+					this.state = StateNavigationWalk.Idle;
 				}
 				else
 				{
 					// 以下、キャラクターの移動処理
 					Vector3 velocity = new Vector3( 0, 0, 1 );
 					velocity = transform.TransformDirection( velocity );
-					transform.localPosition += velocity * 4.0f * this.animatorForward * deltaTime;
+					//transform.localPosition += velocity * 4.0f * this.animatorForward * deltaTime;
 				}
 			}
 			break;
@@ -270,7 +392,19 @@ public class CharacterController : MonoBehaviour
 		{
 			this.animatorForward = 0;
 		}
+
+		// アニメーションの値を実際の速度に反映する
 		this.animator.SetFloat( "Forward", this.animatorForward );
+		float vy = this.rigidbody.velocity.y;
+		Vector3 velocity = new Vector3( 0, 0, 1 );
+//				velocity = transform.TransformDirection( velocity ) * this.animatorForward * 4;
+//				velocity.y = vy;
+//				this.rigidbody.velocity = velocity;
+		velocity = transform.TransformDirection( velocity );
+		velocity = velocity * this.animatorForward * 10f; ;
+		velocity.y = vy;
+		//this.rigidbody.AddForce( velocity * this.animatorForward * 0.5f, ForceMode.VelocityChange );
+		this.rigidbody.velocity = velocity;
 
 		// 左右回転
 		this.animatorTurn *= 0.9f;
@@ -282,7 +416,31 @@ public class CharacterController : MonoBehaviour
 		{
 			this.animatorTurn = Utility.Min<float>( this.animatorTurn, this.animatorTurnMax );
 		}
+
+		// アニメーションの値を実際の速度に反映する
 		this.animator.SetFloat( "Turn", this.animatorTurn * this.animatorSide );
+		Vector3 angularVelocity = this.rigidbody.angularVelocity;
+		angularVelocity.y = this.animatorTurn * this.animatorSide * 3;
+		this.rigidbody.angularVelocity = angularVelocity;
+
+		// 地面に触れてないならジャンプ状態にする
+		Ray ray = new Ray( this.transform.position, Vector3.down );
+		RaycastHit hit = new RaycastHit();
+		if( Physics.Raycast( ray, out hit, 10 ) )
+		{
+			//this.isHitGround = true;
+		}
+		this.animator.SetBool( "OnGround", this.isHitGround );
+
+		if( this.animator.GetCurrentAnimatorStateInfo( 0 ).nameHash == Animator.StringToHash( "Base Layer.Airborne" ) )
+		{
+			this.collider.height = 1;
+		}
+		else
+		{
+			this.collider.height = 2;
+		}
+
 	}
 
 	/// <summary>
@@ -394,13 +552,19 @@ public class CharacterController : MonoBehaviour
 		isEnd = false;
 		return result;
 	}
+
 	void OnCollisionEnter( Collision other )
 	{
-		Debug.LogFormat( "Collision {0}", other.gameObject.name );
+		this.isHitGround = true;
 	}
+
 	void OnGUI()
 	{
 		if( this.townController == null )
+		{
+			return;
+		}
+		if( !this.isPlayer )
 		{
 			return;
 		}
@@ -421,15 +585,14 @@ public class CharacterController : MonoBehaviour
 
 	private void OnAnimatorIK( int layerIndex )
 	{
-		this.animator.SetLookAtWeight( 1.0f, 0.2f, 0.4f, 1.0f, 0.3f );
-
 		if( this.TargetTransform != null )
 		{
+			this.animator.SetLookAtWeight( 1.0f, 0.2f, 0.4f, 1.0f, 0.3f );
 			this.animator.SetLookAtPosition( this.TargetTransform.position );
 		}
 		else
 		{
-			this.animator.SetLookAtPosition( ( this.state == State.Running ) ? this.targetPos : Camera.main.transform.position );
+			//this.animator.SetLookAtPosition( ( this.state == StateNavigationWalk.Running ) ? this.targetPos : Camera.main.transform.position );
 		}
 	}
 

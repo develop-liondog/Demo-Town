@@ -37,14 +37,14 @@ namespace Assets.Scripts.AI.NonePlayer
 
 		public override void Update( CharacterStateContext context )
 		{
-			if( context.Owner.CurrentState == CharacterController.State.Idle )
+			if( context.Owner.CurrentState == CharacterController.StateNavigationWalk.Idle )
 			{
 				if( context.Owner.TargetTransform != null )
 				{
 					float dist = Utility.GetDistanceXZ( context.Owner.TargetTransform.position, context.Owner.transform.position );
 					if( dist > this.FollowMaxDistance )
 					{
-						context.Owner.StartWalk( context.Owner.TargetTransform.position, this.FollowMinDistance );
+						context.Owner.StartNavigationWalk( context.Owner.TargetTransform.position, this.FollowMinDistance );
 					}
 				}
 			}

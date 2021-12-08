@@ -19,6 +19,10 @@ namespace Assets.Scripts.AI
 		{
 		}
 
+		public virtual void FixedUpdate( CharacterStateContext context )
+		{
+		}
+
 		public virtual void Leave( CharacterStateContext context )
 		{
 		}

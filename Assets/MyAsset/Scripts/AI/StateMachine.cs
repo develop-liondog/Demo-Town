@@ -67,5 +67,13 @@ namespace Assets.Scripts.AI
 		{
 			this.CurrentState.Update( this.Context );
 		}
+
+		/// <summary>
+		/// 更新
+		/// </summary>
+		public void FixedUpdate()
+		{
+			this.CurrentState.FixedUpdate( this.Context );
+		}
 	}
 }

@@ -21,6 +21,10 @@ namespace Assets.Scripts.AI
 		{
 		}
 
+		public void FixedUpdate( T obj )
+		{
+		}
+
 		public void Leave( T obj )
 		{
 		}

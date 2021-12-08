@@ -24,6 +24,12 @@ namespace Assets.Scripts.AI
 		public void Update( T obj );
 
 		/// <summary>
+		/// 更新
+		/// </summary>
+		/// <param name="obj"></param>
+		public void FixedUpdate( T obj );
+
+		/// <summary>
 		/// 退出時
 		/// </summary>
 		/// <param name="obj"></param>
