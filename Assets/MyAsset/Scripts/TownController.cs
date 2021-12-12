@@ -20,7 +20,9 @@ public class TownController : MonoBehaviour
 		}
 	}
 
-	// Update is called once per frame
+	/// <summary>
+	/// 
+	/// </summary>
 	void FixedUpdate()
 	{
 		this.time += Time.fixedDeltaTime * this.timescale;
